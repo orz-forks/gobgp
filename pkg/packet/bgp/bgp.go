@@ -180,6 +180,7 @@ const (
 	EC_SUBTYPE_ESI_LABEL    ExtendedCommunityAttrSubType = 0x01 // EC_TYPE: 0x06
 	EC_SUBTYPE_ES_IMPORT    ExtendedCommunityAttrSubType = 0x02 // EC_TYPE: 0x06
 	EC_SUBTYPE_ROUTER_MAC   ExtendedCommunityAttrSubType = 0x03 // EC_TYPE: 0x06
+	EC_SUBTYPE_ND           ExtendedCommunityAttrSubType = 0x08 // EC_TYPE: 0x06
 
 	EC_SUBTYPE_UUID_BASED_RT ExtendedCommunityAttrSubType = 0x11
 )
@@ -12123,6 +12124,45 @@ func NewRoutersMacExtended(mac string) *RouterMacExtended {
 	}
 }
 
+type NdExtended struct {
+	Flag byte
+}
+
+func (e *NdExtended) Serialize() ([]byte, error) {
+	buf := make([]byte, 8)
+	buf[0] = byte(EC_TYPE_EVPN)
+	buf[1] = byte(EC_SUBTYPE_ND)
+	buf[2] = e.Flag
+	return buf, nil
+}
+
+func (e *NdExtended) String() string {
+	return "arp/nd flag: " + fmt.Sprintf("%d", e.Flag)
+}
+
+func (e *NdExtended) MarshalJSON() ([]byte, error) {
+	t, s := e.GetTypes()
+	return json.Marshal(struct {
+		Type    ExtendedCommunityAttrType    `json:"type"`
+		Subtype ExtendedCommunityAttrSubType `json:"subtype"`
+		Flag    byte                         `json:"flag"`
+	}{
+		Type:    t,
+		Subtype: s,
+		Flag:    e.Flag,
+	})
+}
+
+func (e *NdExtended) GetTypes() (ExtendedCommunityAttrType, ExtendedCommunityAttrSubType) {
+	return EC_TYPE_EVPN, EC_SUBTYPE_ND
+}
+
+func NewNdExtended(flag byte) *NdExtended {
+	return &NdExtended{
+		Flag: flag,
+	}
+}
+
 func parseEvpnExtended(data []byte) (ExtendedCommunityInterface, error) {
 	if ExtendedCommunityAttrType(data[0]) != EC_TYPE_EVPN {
 		return nil, NewMessageError(BGP_ERROR_UPDATE_MESSAGE_ERROR, BGP_ERROR_SUB_MALFORMED_ATTRIBUTE_LIST, nil, fmt.Sprintf("ext comm type is not EC_TYPE_EVPN: %d", data[0]))
@@ -12156,6 +12196,10 @@ func parseEvpnExtended(data []byte) (ExtendedCommunityInterface, error) {
 	case EC_SUBTYPE_ROUTER_MAC:
 		return &RouterMacExtended{
 			Mac: net.HardwareAddr(data[2:8]),
+		}, nil
+	case EC_SUBTYPE_ND:
+		return &NdExtended{
+			Flag: data[2],
 		}, nil
 	}
 	return nil, NewMessageError(BGP_ERROR_UPDATE_MESSAGE_ERROR, BGP_ERROR_SUB_MALFORMED_ATTRIBUTE_LIST, nil, fmt.Sprintf("unknown evpn subtype: %d", subType))
@@ -14721,6 +14765,10 @@ func (e *MacMobilityExtended) Flat() map[string]string {
 }
 
 func (e *RouterMacExtended) Flat() map[string]string {
+	return map[string]string{}
+}
+
+func (e *NdExtended) Flat() map[string]string {
 	return map[string]string{}
 }
 
